@@ -1,17 +1,14 @@
 import uvicorn
 from fastapi import FastAPI, Request
 from telegram import Update
+from sqlalchemy import select
 from app.config import settings
 from app.models import Base, RewardTier
 from app.db import engine, SessionLocal
 from app.bot import build_application
-from app.admin import router as admin_router
-from sqlalchemy import select
 
-api = FastAPI(title="Telegram Growth Bot")
+api = FastAPI(title="Telegram Growth Bot — Telegram Admin")
 telegram_app = build_application()
-
-api.include_router(admin_router)
 
 
 @api.on_event("startup")

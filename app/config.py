@@ -5,9 +5,7 @@ class Settings(BaseSettings):
     BOT_TOKEN: str
     DATABASE_URL: str
     WEBHOOK_BASE_URL: str = ""
-    ADMIN_TOKEN: str = "change-me"
     ADMIN_IDS: str = ""
-    SECRET_KEY: str = "change-me"
     PORT: int = 8000
 
     @property

@@ -1,10 +1,7 @@
 import enum
 from datetime import datetime
-from sqlalchemy import (
-    BigInteger, String, Text, DateTime, ForeignKey, Integer, Boolean,
-    UniqueConstraint, Enum
-)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, String, Text, DateTime, ForeignKey, Integer, Boolean, UniqueConstraint, Enum
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
@@ -24,9 +21,20 @@ class InviteStatus(str, enum.Enum):
     banned = "banned"
 
 
+class AdminStep(str, enum.Enum):
+    idle = "idle"
+    campaign_title = "campaign_title"
+    campaign_text = "campaign_text"
+    campaign_photo = "campaign_photo"
+    campaign_button = "campaign_button"
+    tier_required = "tier_required"
+    tier_media = "tier_media"
+    tier_link = "tier_link"
+    banned_word = "banned_word"
+
+
 class Group(Base):
     __tablename__ = "groups"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     title: Mapped[str | None] = mapped_column(String(255))
@@ -37,7 +45,6 @@ class Group(Base):
 
 class BotUser(Base):
     __tablename__ = "bot_users"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     username: Mapped[str | None] = mapped_column(String(255))
@@ -48,7 +55,6 @@ class BotUser(Base):
 
 class Campaign(Base):
     __tablename__ = "campaigns"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), default="Campagne")
     text: Mapped[str] = mapped_column(Text)
@@ -60,7 +66,6 @@ class Campaign(Base):
 class CampaignGroup(Base):
     __tablename__ = "campaign_groups"
     __table_args__ = (UniqueConstraint("campaign_id", "group_id"),)
-
     id: Mapped[int] = mapped_column(primary_key=True)
     campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"))
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
@@ -69,7 +74,6 @@ class CampaignGroup(Base):
 class InviteLink(Base):
     __tablename__ = "invite_links"
     __table_args__ = (UniqueConstraint("group_id", "inviter_user_id"),)
-
     id: Mapped[int] = mapped_column(primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     inviter_user_id: Mapped[int] = mapped_column(ForeignKey("bot_users.id"))
@@ -80,7 +84,6 @@ class InviteLink(Base):
 class Invite(Base):
     __tablename__ = "invites"
     __table_args__ = (UniqueConstraint("group_id", "invited_user_id"),)
-
     id: Mapped[int] = mapped_column(primary_key=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"))
     inviter_user_id: Mapped[int] = mapped_column(ForeignKey("bot_users.id"))
@@ -92,7 +95,6 @@ class Invite(Base):
 
 class RewardTier(Base):
     __tablename__ = "reward_tiers"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     required_invites: Mapped[int] = mapped_column(Integer, unique=True)
     media_count: Mapped[int] = mapped_column(Integer)
@@ -103,7 +105,6 @@ class RewardTier(Base):
 class UserReward(Base):
     __tablename__ = "user_rewards"
     __table_args__ = (UniqueConstraint("user_id", "tier_id"),)
-
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("bot_users.id"))
     tier_id: Mapped[int] = mapped_column(ForeignKey("reward_tiers.id"))
@@ -112,13 +113,13 @@ class UserReward(Base):
 
 class BannedWord(Base):
     __tablename__ = "banned_words"
-
     id: Mapped[int] = mapped_column(primary_key=True)
     word: Mapped[str] = mapped_column(String(255), unique=True)
 
 
-class Admin(Base):
-    __tablename__ = "admins"
-
+class AdminState(Base):
+    __tablename__ = "admin_states"
     id: Mapped[int] = mapped_column(primary_key=True)
-    telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True)
+    telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    step: Mapped[AdminStep] = mapped_column(Enum(AdminStep), default=AdminStep.idle)
+    data: Mapped[str] = mapped_column(Text, default="{}")
