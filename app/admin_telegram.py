@@ -335,9 +335,10 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             data["text"] = text
             await set_state(session, update.effective_user.id, AdminStep.campaign_photo, data)
             await session.commit()
-            await update.message.reply_text("📸 Envoie directement la photo de la campagne.
-
-Ou écris `skip` si tu ne veux pas d’image.")
+            await update.message.reply_text(
+                "📸 Envoie directement la photo de la campagne.\n\n"
+                "Ou écris `skip` si tu ne veux pas ajouter d'image."
+            )
             return True
 
         if state.step == AdminStep.campaign_photo:
@@ -346,12 +347,14 @@ Ou écris `skip` si tu ne veux pas d’image.")
             elif text.lower() == "skip":
                 data["photo_file_id"] = ""
             else:
-                await update.message.reply_text("📸 Envoie une photo directement, ou écris `skip` si tu ne veux pas d’image.")
+                await update.message.reply_text(
+                    "📸 Envoie une vraie photo Telegram, ou écris `skip` si tu ne veux pas d'image."
+                )
                 return True
 
             await set_state(session, update.effective_user.id, AdminStep.campaign_button, data)
             await session.commit()
-            await update.message.reply_text("OK. Photo enregistrée. Envoie maintenant le texte du bouton. Exemple : 🎁 Recevoir mes vidéos")
+            await update.message.reply_text("OK. Envoie le texte du bouton. Exemple : 🎁 Recevoir mes vidéos")
             return True
 
         if state.step == AdminStep.campaign_button:
@@ -365,53 +368,38 @@ Ou écris `skip` si tu ne veux pas d’image.")
             )
             session.add(campaign)
             await session.flush()
+            cid = campaign.id
+            await set_state(session, update.effective_user.id, AdminStep.idle)
+            await session.commit()
 
-            q = await session.execute(select(Group).where(Group.status == GroupStatus.approved).order_by(Group.title))
-            groups = q.scalars().all()
+            qg = await session.execute(select(Group).where(Group.status == GroupStatus.approved).order_by(Group.title))
+            groups = qg.scalars().all()
             if not groups:
-                await set_state(session, update.effective_user.id, AdminStep.idle)
-                await session.commit()
                 await update.message.reply_text("Campagne créée, mais aucun groupe validé disponible.", reply_markup=admin_menu_keyboard())
                 return True
 
-            data = {"campaign_id": campaign.id, "selected": []}
-            await set_state(session, update.effective_user.id, AdminStep.idle, data)
-            await session.commit()
-
             kb = []
             for g in groups:
-                kb.append([InlineKeyboardButton(f"☐ {g.title}", callback_data=f"adm_camp_select_{campaign.id}_{g.id}")])
-            kb.append([InlineKeyboardButton("✅ Terminer sélection", callback_data=f"adm_camp_done_{campaign.id}")])
+                kb.append([InlineKeyboardButton(f"☐ {g.title}", callback_data=f"adm_camp_select_{cid}_{g.id}")])
+            kb.append([InlineKeyboardButton("✅ Terminer sélection", callback_data=f"adm_campaign_detail_{cid}")])
             await update.message.reply_text("Sélectionne les groupes pour cette campagne :", reply_markup=InlineKeyboardMarkup(kb))
             return True
 
-        if state.step == AdminStep.tier_required:
-            data["required_invites"] = int(text)
-            await set_state(session, update.effective_user.id, AdminStep.tier_media, data)
-            await session.commit()
-            await update.message.reply_text("OK. Envoie le nombre de médias. Exemple : 20")
-            return True
-
-        if state.step == AdminStep.tier_media:
-            data["media_count"] = int(text)
-            await set_state(session, update.effective_user.id, AdminStep.tier_link, data)
-            await session.commit()
-            await update.message.reply_text("OK. Envoie le lien Gofile.")
-            return True
-
         if state.step == AdminStep.tier_link:
-            required = int(data["required_invites"])
+            required = int(data["required"])
+            media_map = dict(FIXED_TIERS)
+            media_count = media_map.get(required, 0)
             q = await session.execute(select(RewardTier).where(RewardTier.required_invites == required))
             tier = q.scalar_one_or_none()
             if not tier:
-                tier = RewardTier(required_invites=required, media_count=int(data["media_count"]), gofile_link=text, title=f"Palier {required}")
+                tier = RewardTier(required_invites=required, media_count=media_count, gofile_link=text, title=f"Palier {required}")
                 session.add(tier)
             else:
-                tier.media_count = int(data["media_count"])
+                tier.media_count = media_count
                 tier.gofile_link = text
             await set_state(session, update.effective_user.id, AdminStep.idle)
             await session.commit()
-            await update.message.reply_text("✅ Palier enregistré.", reply_markup=admin_menu_keyboard())
+            await update.message.reply_text("✅ Lien Gofile enregistré.", reply_markup=admin_menu_keyboard())
             return True
 
         if state.step == AdminStep.banned_word:
@@ -428,7 +416,6 @@ Ou écris `skip` si tu ne veux pas d’image.")
             return True
 
     return False
-
 
 async def handle_campaign_group_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     query = update.callback_query
