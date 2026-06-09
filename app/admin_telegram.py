@@ -335,14 +335,23 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             data["text"] = text
             await set_state(session, update.effective_user.id, AdminStep.campaign_photo, data)
             await session.commit()
-            await update.message.reply_text("OK. Envoie le file_id de la photo, ou écris `skip`.")
+            await update.message.reply_text("📸 Envoie directement la photo de la campagne.
+
+Ou écris `skip` si tu ne veux pas d’image.")
             return True
 
         if state.step == AdminStep.campaign_photo:
-            data["photo_file_id"] = "" if text.lower() == "skip" else text
+            if update.message.photo:
+                data["photo_file_id"] = update.message.photo[-1].file_id
+            elif text.lower() == "skip":
+                data["photo_file_id"] = ""
+            else:
+                await update.message.reply_text("📸 Envoie une photo directement, ou écris `skip` si tu ne veux pas d’image.")
+                return True
+
             await set_state(session, update.effective_user.id, AdminStep.campaign_button, data)
             await session.commit()
-            await update.message.reply_text("OK. Envoie le texte du bouton. Exemple : 🎁 Recevoir des médias")
+            await update.message.reply_text("OK. Photo enregistrée. Envoie maintenant le texte du bouton. Exemple : 🎁 Recevoir mes vidéos")
             return True
 
         if state.step == AdminStep.campaign_button:
