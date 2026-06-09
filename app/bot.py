@@ -129,7 +129,43 @@ async def count_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await session.commit()
 
 
+
+async def send_campaign_message(context: ContextTypes.DEFAULT_TYPE, group: Group, campaign: Campaign, delete_after: bool = True):
+    bot_username = (await context.bot.get_me()).username
+    start_url = f"https://t.me/{bot_username}?start=get_{group.id}"
+    keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(campaign.button_text, url=start_url)]])
+
+    commercial_text = (
+        f"{campaign.text}\n\n"
+        "⚡ Accès privé limité\n"
+        "🎬 Débloque tes médias en invitant tes amis\n"
+        "🏆 Les meilleurs repartent avec le VIP à vie"
+    )
+
+    if campaign.photo_file_id:
+        msg = await context.bot.send_photo(
+            chat_id=group.telegram_chat_id,
+            photo=campaign.photo_file_id,
+            caption=commercial_text,
+            reply_markup=keyboard
+        )
+    else:
+        msg = await context.bot.send_message(
+            chat_id=group.telegram_chat_id,
+            text=commercial_text,
+            reply_markup=keyboard
+        )
+
+    if delete_after:
+        context.job_queue.run_once(
+            delete_message_job,
+            when=20 * 60,
+            data={"chat_id": group.telegram_chat_id, "message_id": msg.message_id}
+        )
+
+
 async def publish_campaign(context: ContextTypes.DEFAULT_TYPE, group_id: int):
+    """Publication automatique : suppression après 20 minutes."""
     async with SessionLocal() as session:
         group = await session.get(Group, group_id)
         if not group or group.status != GroupStatus.approved:
@@ -145,36 +181,30 @@ async def publish_campaign(context: ContextTypes.DEFAULT_TYPE, group_id: int):
         if not campaign:
             return
 
-        bot_username = (await context.bot.get_me()).username
-        start_url = f"https://t.me/{bot_username}?start=get_{group.id}"
-        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(campaign.button_text, url=start_url)]])
+        await send_campaign_message(context, group, campaign, delete_after=True)
 
-        commercial_text = (
-            f"{campaign.text}\n\n"
-            "⚡ Accès privé limité\n"
-            "🎬 Débloque tes médias en invitant tes amis\n"
-            "🏆 Les meilleurs repartent avec le VIP à vie"
+
+async def publish_campaign_manual(context: ContextTypes.DEFAULT_TYPE, campaign_id: int):
+    """Publication manuelle admin : ne s'efface pas automatiquement."""
+    async with SessionLocal() as session:
+        campaign = await session.get(Campaign, campaign_id)
+        if not campaign:
+            return 0
+
+        q = await session.execute(
+            select(Group)
+            .join(CampaignGroup, CampaignGroup.group_id == Group.id)
+            .where(CampaignGroup.campaign_id == campaign.id, Group.status == GroupStatus.approved)
         )
-
-        if campaign.photo_file_id:
-            msg = await context.bot.send_photo(
-                chat_id=group.telegram_chat_id,
-                photo=campaign.photo_file_id,
-                caption=commercial_text,
-                reply_markup=keyboard
-            )
-        else:
-            msg = await context.bot.send_message(
-                chat_id=group.telegram_chat_id,
-                text=commercial_text,
-                reply_markup=keyboard
-            )
-
-        context.job_queue.run_once(
-            delete_message_job,
-            when=20 * 60,
-            data={"chat_id": group.telegram_chat_id, "message_id": msg.message_id}
-        )
+        groups = q.scalars().all()
+        sent = 0
+        for group in groups:
+            try:
+                await send_campaign_message(context, group, campaign, delete_after=False)
+                sent += 1
+            except Exception:
+                pass
+        return sent
 
 
 async def delete_message_job(context: ContextTypes.DEFAULT_TYPE):

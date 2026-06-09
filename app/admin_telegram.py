@@ -17,7 +17,7 @@ def is_admin(user_id: int) -> bool:
 def admin_menu_keyboard():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🆕 Groupes en attente", callback_data="adm_groups_pending")],
-        [InlineKeyboardButton("✅ Groupes validés", callback_data="adm_groups_approved")],
+        [InlineKeyboardButton("📋 Mes groupes", callback_data="adm_groups_approved")],
         [InlineKeyboardButton("📢 Campagnes pub", callback_data="adm_campaigns")],
         [InlineKeyboardButton("🎁 Paliers / Gofile", callback_data="adm_tiers")],
         [InlineKeyboardButton("🚫 Mots bannis", callback_data="adm_banned")],
@@ -106,7 +106,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "adm_groups_approved":
             q = await session.execute(select(Group).where(Group.status == GroupStatus.approved).order_by(Group.title))
             groups = q.scalars().all()
-            text = "✅ Groupes validés :\n\n" + ("\n".join([f"• {g.title} — {g.message_count}/100 messages" for g in groups]) if groups else "Aucun.")
+            text = "📋 Mes groupes :\n\n" + ("\n".join([f"• {g.title} — {g.message_count}/100 messages — pub dans {100 - g.message_count} messages" for g in groups]) if groups else "Aucun.")
             await query.edit_message_text(text, reply_markup=back_keyboard())
             return
 
@@ -116,13 +116,45 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("➕ Créer campagne", callback_data="adm_campaign_create")]]
             for c in campaigns[:10]:
                 status = "🟢" if c.active else "🔴"
-                kb.append([InlineKeyboardButton(f"{status} {c.title}", callback_data=f"adm_campaign_toggle_{c.id}")])
+                kb.append([InlineKeyboardButton(f"{status} {c.title}", callback_data=f"adm_campaign_detail_{c.id}")])
             kb.append([InlineKeyboardButton("⬅️ Menu admin", callback_data="adm_menu")])
             await query.edit_message_text(
                 "📢 Campagnes pub\n\n"
-                "Bouton sur une campagne = activer/désactiver.\n"
-                "Créer campagne = assistant étape par étape.",
+                "Clique une campagne pour la gérer.\n"
+                "Tu peux publier manuellement sans suppression auto.",
                 reply_markup=InlineKeyboardMarkup(kb)
+            )
+            return
+
+        if data.startswith("adm_campaign_detail_"):
+            cid = int(data.replace("adm_campaign_detail_", ""))
+            campaign = await session.get(Campaign, cid)
+            if not campaign:
+                await query.edit_message_text("Campagne introuvable.", reply_markup=back_keyboard())
+                return
+            q = await session.execute(select(func.count(CampaignGroup.id)).where(CampaignGroup.campaign_id == cid))
+            group_count = q.scalar() or 0
+            await query.edit_message_text(
+                f"📢 Campagne : {campaign.title}\n\n"
+                f"Statut : {'🟢 Active' if campaign.active else '🔴 Inactive'}\n"
+                f"Groupes ciblés : {group_count}\n\n"
+                f"Bouton : {campaign.button_text}\n\n"
+                "📣 Publier pub = publication immédiate dans les groupes ciblés, sans suppression automatique.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📣 Publier pub", callback_data=f"adm_campaign_publish_{cid}")],
+                    [InlineKeyboardButton("🟢/🔴 Activer-Désactiver", callback_data=f"adm_campaign_toggle_{cid}")],
+                    [InlineKeyboardButton("⬅️ Campagnes", callback_data="adm_campaigns")],
+                ])
+            )
+            return
+
+        if data.startswith("adm_campaign_publish_"):
+            cid = int(data.replace("adm_campaign_publish_", ""))
+            from app.bot import publish_campaign_manual
+            sent = await publish_campaign_manual(context, cid)
+            await query.edit_message_text(
+                f"📣 Pub publiée manuellement.\n\nGroupes touchés : {sent}\n\nElle ne sera pas supprimée automatiquement.",
+                reply_markup=back_keyboard()
             )
             return
 
@@ -247,11 +279,29 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 checks.append(f"❌ Webhook : {e}")
 
-            await query.edit_message_text(
+            qg = await session.execute(select(Group).order_by(Group.title))
+            groups = qg.scalars().all()
+            group_lines = []
+            for g in groups:
+                if g.status == GroupStatus.approved:
+                    group_lines.append(f"📍 {g.title}\n✅ Validé — {g.message_count}/100 messages\n🚀 Prochaine pub dans : {100 - g.message_count} messages")
+                elif g.status == GroupStatus.pending:
+                    group_lines.append(f"📍 {g.title}\n🕒 En attente")
+                else:
+                    group_lines.append(f"📍 {g.title}\n❌ Refusé")
+
+            info_text = (
                 "ℹ️ Info bot\n\n"
                 f"Ton ID : {query.from_user.id}\n"
-                f"Admin détecté : ✅\n\n" + "\n".join(checks),
-                reply_markup=back_keyboard()
+                f"Admin détecté : ✅\n\n" + "\n".join(checks) +
+                "\n\n📊 Groupes branchés\n\n" + ("\n\n".join(group_lines) if group_lines else "Aucun groupe détecté.")
+            )
+            await query.edit_message_text(
+                info_text[:3900],
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 Actualiser", callback_data="adm_info")],
+                    [InlineKeyboardButton("⬅️ Menu admin", callback_data="adm_menu")],
+                ])
             )
             return
 
