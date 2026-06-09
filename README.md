@@ -1,64 +1,51 @@
-# Telegram Growth Bot — Railway + Python + PostgreSQL
+# Telegram Growth Bot — Admin 100% Telegram
 
-Bot Telegram avec :
-- validation des groupes depuis admin
-- campagnes pub texte/photo
-- auto-publication tous les 100 messages
-- suppression auto après 20 min
-- bouton "Recevoir des médias"
-- lien d'invitation unique par utilisateur/groupe
-- tracking des invités
-- validation après 10 minutes
-- paliers Gofile / récompenses
-- anti-mots interdits dans pseudo/nom
-- notification admins
-- participation à un seul groupe à la fois
+Tout se gère depuis Telegram.
 
-## Stack
-- Python 3.11+
-- FastAPI
-- python-telegram-bot
-- SQLAlchemy async
-- PostgreSQL
-- Railway
+## Fonctions
+
+### Admin Telegram
+Quand un admin fait `/start`, le bot détecte son ID avec `ADMIN_IDS` et affiche :
+
+- 🆕 Groupes en attente
+- ✅ Groupes validés
+- 📢 Campagnes pub
+- 🎁 Paliers / Gofile
+- 🚫 Mots bannis
+- 📊 Statistiques
+- ℹ️ Info bot
+
+### Utilisateur
+- voit la pub dans un groupe
+- clique "🎁 Recevoir des médias"
+- reçoit son lien unique
+- reçoit une notification quand quelqu'un rejoint avec son lien
+- reçoit une notification après validation
+- reçoit automatiquement les liens Gofile quand il atteint un palier
 
 ## Variables Railway
 
 ```env
-BOT_TOKEN=123456:ABC
-DATABASE_URL=postgresql+asyncpg://user:pass@host:port/db
+BOT_TOKEN=token_botfather
+DATABASE_URL=postgresql+asyncpg://postgres:pass@postgres.railway.internal:5432/railway
 WEBHOOK_BASE_URL=https://ton-app.up.railway.app
-ADMIN_TOKEN=change-moi
-ADMIN_IDS=123456789,987654321
-SECRET_KEY=change-moi-long
+ADMIN_IDS=ton_id_telegram,autre_id
 ```
 
-## Installation locale
+## Important Telegram
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python -m app.main
-```
+Dans BotFather :
+- désactiver Group Privacy
+
+Dans les groupes :
+- le bot doit être admin
+- droits nécessaires : supprimer messages, bannir membres, créer liens d'invitation
 
 ## Déploiement Railway
 
-1. Créer projet Railway
-2. Ajouter PostgreSQL
-3. Ajouter les variables d'environnement
-4. Déployer depuis GitHub
-5. Railway expose l'app FastAPI
-6. Au démarrage, le webhook Telegram est configuré automatiquement
-
-## Notes Telegram importantes
-
-Le bot doit être admin des groupes avec :
-- can_delete_messages
-- can_invite_users
-- can_restrict_members
-- can_manage_chat idéalement
-
-Pour tracker les entrées classiques, on utilise `chat_member`.
-Pour les liens avec demande d'approbation, Telegram peut envoyer `chat_join_request`.
+1. Upload sur GitHub
+2. Connecte Railway
+3. Ajoute PostgreSQL
+4. Mets les variables
+5. Deploy
+6. Va sur Telegram et fais `/start`
