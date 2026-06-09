@@ -49,3 +49,21 @@ Dans les groupes :
 4. Mets les variables
 5. Deploy
 6. Va sur Telegram et fais `/start`
+
+
+## V2 ajoutée
+
+Dans Telegram :
+
+```text
+/start → 📢 Campagnes pub → clique une campagne → 📣 Publier pub
+```
+
+Ce bouton publie la pub immédiatement dans tous les groupes cochés pour cette campagne. Cette publication manuelle ne s'efface pas automatiquement.
+
+Dans `ℹ️ Info bot`, chaque groupe affiche aussi :
+
+```text
+Messages : 72/100
+Prochaine pub dans : 28 messages
+```
