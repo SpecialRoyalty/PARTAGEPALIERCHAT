@@ -62,7 +62,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "300 invités = 500 médias\n"
                 "500 invités = 1500 médias\n"
                 "1000 invités = VIP gratuit à vie\n\n"
-                "Conseil : partage ton lien dans tes groupes, stories, canaux et DM."
+                "Conseil : partage ton lien dans tes groupes, stories, canaux et DM. Leakmedia / Tiktok / Discord"
+                "UNIQUEMENT DES PERSONNES FR sinon tu seras ban ! "
             )
             return
 
